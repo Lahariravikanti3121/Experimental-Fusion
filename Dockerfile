@@ -13,9 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first (Docker layer caching)
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install PyTorch FIRST (CPU-only for deployment — much smaller image)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install torch-geometric and torch-scatter AFTER torch is available
+RUN pip install --no-cache-dir torch-scatter torch-geometric -f https://data.pyg.org/whl/torch-2.7.0+cpu.html
+
+# Install remaining dependencies
+RUN pip install --no-cache-dir numpy pandas scipy scikit-learn openpyxl fair-esm flask flask-cors gunicorn networkx
 
 # Copy application code
 COPY . .
