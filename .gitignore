@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+server.log
+
+# Model checkpoints (too large for GitHub - use Git LFS or cloud storage)
+# Uncomment below if you want to exclude model files:
+# save/*.pth
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ESM model cache
+torch_hub/
+.cache/

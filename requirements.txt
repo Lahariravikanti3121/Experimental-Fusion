@@ -1,0 +1,22 @@
+# Core deep learning stack
+torch
+torch-geometric
+torch-scatter
+
+# Numerical/data processing
+numpy
+pandas
+scipy
+scikit-learn
+openpyxl
+
+# Protein language model
+fair-esm
+
+# Web server
+flask
+flask-cors
+gunicorn
+
+# Visualization
+networkx

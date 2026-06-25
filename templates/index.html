@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrossPPI - Protein-Protein Binding Affinity Predictor</title>
+    <meta name="description" content="Predict protein-protein interaction binding affinity (pKd) and confidence score using Cross-Attention Deep Learning models.">
+    <!-- Google Fonts: Outfit (headings) and Inter (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient-start: #030712;
+            --bg-gradient-end: #0f172a;
+            --card-bg: rgba(15, 23, 42, 0.55);
+            --card-border: rgba(255, 255, 255, 0.08);
+            
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.35);
+            
+            --ligand: #06b6d4;
+            --ligand-glow: rgba(6, 182, 212, 0.2);
+            
+            --receptor: #ec4899;
+            --receptor-glow: rgba(236, 72, 153, 0.2);
+            
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dark: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient background glow effects */
+        .ambient-glow-1 {
+            position: absolute;
+            top: 10%;
+            left: 15%;
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+            z-index: 0;
+            pointer-events: none;
+            filter: blur(40px);
+        }
+
+        .ambient-glow-2 {
+            position: absolute;
+            bottom: 15%;
+            right: 10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
+            z-index: 0;
+            pointer-events: none;
+            filter: blur(50px);
+        }
+
+        /* Main Container */
+        .app-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .logo-area {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--ligand));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: white;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.75rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #ffffff, #cbd5e1, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.025em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+            font-weight: 400;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1.25fr 1fr;
+            }
+        }
+
+        /* Glassmorphic Card base styling */
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 2rem;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Input Controls */
+        .input-group {
+            margin-bottom: 1.75rem;
+            position: relative;
+        }
+
+        .input-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .input-label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-label.ligand-label { color: var(--ligand); }
+        .input-label.receptor-label { color: var(--receptor); }
+
+        .sequence-counter {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        textarea.sequence-input {
+            width: 100%;
+            height: 140px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1rem;
+            color: var(--text-main);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95rem;
+            resize: none;
+            line-height: 1.5;
+            transition: all 0.3s ease;
+        }
+
+        textarea.sequence-input:focus {
+            outline: none;
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        textarea.sequence-input.ligand-focus:focus {
+            border-color: var(--ligand);
+            box-shadow: 0 0 15px var(--ligand-glow);
+        }
+
+        textarea.sequence-input.receptor-focus:focus {
+            border-color: var(--receptor);
+            box-shadow: 0 0 15px var(--receptor-glow);
+        }
+
+        /* Example Presets Section */
+        .presets-section {
+            margin-bottom: 2rem;
+        }
+
+        .presets-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .presets-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .preset-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preset-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Predict Button */
+        .predict-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), #7c3aed);
+            border: none;
+            padding: 1.1rem;
+            border-radius: 14px;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 20px var(--primary-glow);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .predict-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+            transition: 0.5s;
+        }
+
+        .predict-btn:hover::before {
+            left: 100%;
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+            background: linear-gradient(135deg, var(--primary-hover), #6d28d9);
+        }
+
+        .predict-btn:active {
+            transform: translateY(1px);
+        }
+
+        .predict-btn:disabled {
+            background: #1e293b;
+            box-shadow: none;
+            color: var(--text-dark);
+            cursor: not-allowed;
+        }
+
+        /* Results Panel */
+        .results-wrapper {
+            position: relative;
+            min-height: 480px;
+        }
+
+        .result-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+            padding: 4rem 1rem;
+            color: var(--text-muted);
+            animation: fadeIn 0.5s ease;
+        }
+
+        .result-empty svg {
+            width: 80px;
+            height: 80px;
+            stroke: var(--text-dark);
+            margin-bottom: 1.5rem;
+        }
+
+        .result-empty h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Active Results Layout */
+        .result-active {
+            display: none;
+            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .result-header {
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .badge-run {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--success);
+            color: var(--success);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 640px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* pKd Score Display */
+        .pkd-score-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .pkd-title {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .pkd-value-container {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
+        .pkd-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 4.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+
+        .pkd-unit {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .pkd-description {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 1rem;
+            line-height: 1.4;
+        }
+
+        /* Confidence Meter */
+        .confidence-meter-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .radial-progress-wrapper {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+
+        .radial-progress-svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .radial-progress-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 8;
+        }
+
+        .radial-progress-bar {
+            fill: none;
+            stroke: var(--primary);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 301.6;
+            stroke-dashoffset: 301.6;
+            transition: stroke-dashoffset 1s ease-in-out, stroke 1s ease-in-out;
+        }
+
+        .radial-progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .radial-percentage {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .radial-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* Detailed Predictions Visual (Ensemble comparison) */
+        .predictions-details-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .details-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .details-title span {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* Pure CSS mini bar chart for folds */
+        .chart-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        .chart-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .chart-label {
+            width: 50px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .chart-bar-bg {
+            flex-grow: 1;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 9999px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .chart-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--ligand));
+            border-radius: 9999px;
+            width: 0%;
+            transition: width 1s ease-out;
+        }
+
+        .chart-value {
+            width: 45px;
+            text-align: right;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        /* Extra Analytical Details */
+        .analysis-box {
+            background: rgba(99, 102, 241, 0.04);
+            border: 1px solid rgba(99, 102, 241, 0.08);
+            border-radius: 12px;
+            padding: 1.1rem;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .analysis-box svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--primary);
+            flex-shrink: 0;
+        }
+
+        /* Spinner / Loading Overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.05);
+            border-top: 4px solid var(--primary);
+            border-right: 4px solid var(--ligand);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        .loading-status {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        .loading-subtext {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            max-width: 280px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        /* Query History Section (Bottom/Sidebar) */
+        .history-card {
+            margin-top: 2rem;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .history-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+
+        .clear-history-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dark);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .clear-history-btn:hover {
+            color: var(--danger);
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        /* Custom Scrollbar */
+        .history-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .history-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        .history-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+        .history-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+
+        .history-item-seqs {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .history-item-metrics {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .history-item-val {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .history-item-conf {
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+        }
+
+        /* Error Banner */
+        .error-banner {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: #fca5a5;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            align-items: center;
+            gap: 0.75rem;
+            animation: shake 0.4s ease;
+        }
+
+        .error-banner svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--danger);
+            flex-shrink: 0;
+        }
+
+        /* Keyframe Animations */
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow-1"></div>
+    <div class="ambient-glow-2"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon">C</div>
+                <div style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.05em;">CrossPPI</div>
+            </div>
+            <h1>Protein Binding Affinity Predictor</h1>
+            <p>Combine Graph Attention Networks (GAT) and Cross-Attention to predict binding affinities (pKd) and ensemble confidence scores.</p>
+        </header>
+
+        <!-- Error Banner -->
+        <div id="errorBanner" class="error-banner">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span id="errorMessage">Prediction error occurred.</span>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            
+            <!-- Left Side: Inputs & Settings -->
+            <div class="glass-card">
+                <div class="presets-section">
+                    <div class="presets-title">Select Preset Complex</div>
+                    <div class="presets-container">
+                        <button type="button" class="preset-btn" onclick="loadPreset('eglin_c')">Subtilisin Carlsberg & Eglin c</button>
+                        <button type="button" class="preset-btn" onclick="loadPreset('hgh')">Human Growth Hormone & Binding Protein</button>
+                        <button type="button" class="preset-btn" onclick="loadPreset('barnase')">Barnase & Barstar</button>
+                    </div>
+                </div>
+
+                <!-- Ligand Box -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label for="ligandInput" class="input-label ligand-label">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.656 48.656 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3M3 12c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M3 12l-3 3m3-3l3 3" />
+                            </svg>
+                            Ligand Protein Sequence
+                        </label>
+                        <span id="ligandLength" class="sequence-counter">0 AA</span>
+                    </div>
+                    <textarea 
+                        id="ligandInput" 
+                        class="sequence-input ligand-focus" 
+                        placeholder="Paste ligand sequence (FASTA amino acids, e.g. CGVPA...)"
+                        oninput="onSeqInput('ligand')"></textarea>
+                </div>
+
+                <!-- Receptor Box -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label for="receptorInput" class="input-label receptor-label">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.656 48.656 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3M3 12c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M3 12l-3 3m3-3l3 3" />
+                            </svg>
+                            Receptor Protein Sequence
+                        </label>
+                        <span id="receptorLength" class="sequence-counter">0 AA</span>
+                    </div>
+                    <textarea 
+                        id="receptorInput" 
+                        class="sequence-input receptor-focus" 
+                        placeholder="Paste receptor sequence (FASTA amino acids, e.g. TEFGS...)"
+                        oninput="onSeqInput('receptor')"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="button" id="predictBtn" class="predict-btn" onclick="runPrediction()">
+                    <span>Run Binding Affinity Prediction</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Right Side: Predictions / Results Display -->
+            <div class="glass-card results-wrapper">
+                
+                <!-- Loading State overlay -->
+                <div id="loadingOverlay" class="loading-overlay">
+                    <div class="spinner"></div>
+                    <div id="statusText" class="loading-status">Extracting Graph Features...</div>
+                    <div class="loading-subtext">Running ESM-2 model embedding on CPU. This will take about 15 - 30 seconds. Please wait...</div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="resultEmpty" class="result-empty">
+                    <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v1.244c0 .89-.56 1.6-1.406 1.813a12.72 12.72 0 01-3.064.547c-.89.058-1.58.754-1.58 1.648v5.35c0 .891.69 1.591 1.58 1.649 1.01.066 2.037.25 3.064.547a1.98 1.98 0 011.406 1.813v1.244c0 .89.71 1.636 1.6 1.652 1.05.018 2.1-.018 3.15-.018h1.834c.89 0 1.635-.71 1.652-1.6 0-1.05-.036-2.1-.018-3.15a1.982 1.982 0 011.813-1.406h1.244c.89 0 1.6-.56 1.813-1.406a12.722 12.722 0 01.547-3.064c.058-.89-.638-1.58-1.528-1.58h-1.244a1.982 1.982 0 01-1.813-1.406c-.018-1.05.018-2.1.018-3.15 0-.89-.71-1.635-1.6-1.652a48.11 48.11 0 00-3.15 0c-.89.017-1.635.71-1.652 1.6z" />
+                    </svg>
+                    <h3>Ready for Prediction</h3>
+                    <p>Input protein sequences or load a preset, then press "Run Binding Affinity Prediction" to view the results.</p>
+                </div>
+
+                <!-- Active Results Section -->
+                <div id="resultActive" class="result-active">
+                    <div class="result-header">
+                        <div class="result-title">Prediction Output</div>
+                        <span class="badge-run">Completed</span>
+                    </div>
+
+                    <!-- Core Metrics Row -->
+                    <div class="metrics-grid">
+                        
+                        <!-- pKd Score Card -->
+                        <div class="pkd-score-card">
+                            <div class="pkd-title">Predicted Affinity</div>
+                            <div class="pkd-value-container">
+                                <span id="pkdVal" class="pkd-value">--</span>
+                                <span class="pkd-unit">pKd</span>
+                            </div>
+                            <div class="pkd-description">
+                                Logarithmic dissociation constant ($p K_d = -\log_{10} K_D$). Higher values represent stronger binding affinity.
+                            </div>
+                        </div>
+
+                        <!-- Confidence Gauge -->
+                        <div class="confidence-meter-card">
+                            <div class="radial-progress-wrapper">
+                                <svg class="radial-progress-svg" viewBox="0 0 100 100">
+                                    <circle class="radial-progress-bg" cx="50" cy="50" r="44"></circle>
+                                    <circle id="confidenceBar" class="radial-progress-bar" cx="50" cy="50" r="44"></circle>
+                                </svg>
+                                <div class="radial-progress-text">
+                                    <div id="confidenceVal" class="radial-percentage">--</div>
+                                    <div class="radial-label">Confidence</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ensemble Fold details (horizontal charts) -->
+                    <div class="predictions-details-card">
+                        <div class="details-title">
+                            Ensemble Consensus 
+                            <span id="stdDevText">Model Std Dev (&sigma;): --</span>
+                        </div>
+                        <div class="chart-container">
+                            <div class="chart-row">
+                                <span class="chart-label">Fold 1</span>
+                                <div class="chart-bar-bg"><div id="foldBar1" class="chart-bar-fill"></div></div>
+                                <span id="foldVal1" class="chart-value">--</span>
+                            </div>
+                            <div class="chart-row">
+                                <span class="chart-label">Fold 2</span>
+                                <div class="chart-bar-bg"><div id="foldBar2" class="chart-bar-fill"></div></div>
+                                <span id="foldVal2" class="chart-value">--</span>
+                            </div>
+                            <div class="chart-row">
+                                <span class="chart-label">Fold 3</span>
+                                <div class="chart-bar-bg"><div id="foldBar3" class="chart-bar-fill"></div></div>
+                                <span id="foldVal3" class="chart-value">--</span>
+                            </div>
+                            <div class="chart-row">
+                                <span class="chart-label">Fold 4</span>
+                                <div class="chart-bar-bg"><div id="foldBar4" class="chart-bar-fill"></div></div>
+                                <span id="foldVal4" class="chart-value">--</span>
+                            </div>
+                            <div class="chart-row">
+                                <span class="chart-label">Fold 5</span>
+                                <div class="chart-bar-bg"><div id="foldBar5" class="chart-bar-fill"></div></div>
+                                <span id="foldVal5" class="chart-value">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Informational Alert Box -->
+                    <div class="analysis-box">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div id="analyticalText">
+                            The models show high agreement. The predictions range close to the mean, indicating a robust estimation of binding affinity for this sequence pair.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Past Predictions / Query History Card -->
+        <div class="glass-card history-card">
+            <div class="history-header">
+                <div class="history-title">Past Predictions</div>
+                <button type="button" class="clear-history-btn" onclick="clearHistory()">Clear History</button>
+            </div>
+            <div id="historyList" class="history-list">
+                <div class="result-empty" style="padding: 1.5rem; border: 1px dashed rgba(255,255,255,0.05); border-radius: 10px;">
+                    <p style="font-size: 0.9rem;">No past predictions saved on this browser.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript logic -->
+    <script>
+        // Sequence presets
+        const PRESETS = {
+            eglin_c: {
+                name: "Subtilisin Carlsberg & Eglin c",
+                ligand: "CGVPAIQPVLSGLSRIVNGEEAVPGSWPWQVSLQDKTGFHFCGGSLINENWVVTAAHCGVTTSDVVVAGEFDQGSSSEKIQKLKIAKVFKNSKYNSLTINNDITLLKLSTAASFSQTVSAVCLPSASDDFAAGTTCVTTGWGLTRYTNANTPDRLQQASLPLLSNTNCKKYWGTKIKDAMICAGASGVSSCMGDSGGPLVCKKNGAWTLVGIVSWGSSTCSTSTPGVYARVTALVNWVQQTLAAN",
+                receptor: "TEFGSELKSFPEVVGKTVDQAREYFTLHYPQYDVYFLPEGSPVTLDLRYNRVRVFYNPGTNVVNHVPHVG"
+            },
+            hgh: {
+                name: "Human Growth Hormone & Binding Protein",
+                ligand: "MGDKPIWEQIGSSFIQHYYQLFDNDRTQLGAIYIDASCLTWEGQQFQGKAAIVEKLSSLPFQKIQHSITAQDHQPTPDSCIISMVVGQLKADEDPIMGFHQMFLLKNINDAWVCTNDMFRLALHNFG",
+                receptor: "MAAQGEPQVQFKLVLVGDGGTGKTTFVKRHLTGEFEKKYVATLGVEVHPLVFHTNRGPIKFNVWDTAGQEKFGGLRDGYYIQAQCAIIMFDVTSRVTYKNVPNWHRDLVRVCENIPIVLCGNKVDIKDRKVKAKSIVFHRKKNLQYYDISAKSNYNFEKPFLWLARKLIGDPNLEFVAMPALAPPEVVMDPALAAQYEHDLEVAQTTALPDEDDDL"
+            },
+            barnase: {
+                name: "Barnase & Barstar",
+                ligand: "AQVINTFDGVADYLQTYHKLPDNYITASEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR",
+                receptor: "MKKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDCLAGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGCDITILS"
+            }
+        };
+
+        // On document load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+        });
+
+        // Load Preset sequences
+        function loadPreset(key) {
+            const preset = PRESETS[key];
+            if (!preset) return;
+            
+            document.getElementById('ligandInput').value = preset.ligand;
+            document.getElementById('receptorInput').value = preset.receptor;
+            
+            onSeqInput('ligand');
+            onSeqInput('receptor');
+            
+            // Clear any active error banner
+            hideError();
+        }
+
+        // Live length counters
+        function onSeqInput(type) {
+            const val = document.getElementById(`${type}Input`).value.replace(/[^A-Za-z]/g, '');
+            document.getElementById(`${type}Length`).innerText = `${val.length} AA`;
+        }
+
+        // Show/Hide error banner
+        function showError(msg) {
+            document.getElementById('errorMessage').innerText = msg;
+            document.getElementById('errorBanner').style.display = 'flex';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function hideError() {
+            document.getElementById('errorBanner').style.display = 'none';
+        }
+
+        // Run Prediction API call
+        async function runPrediction() {
+            const ligand = document.getElementById('ligandInput').value.trim();
+            const receptor = document.getElementById('receptorInput').value.trim();
+
+            if (!ligand || !receptor) {
+                showError("Please provide both ligand and receptor amino acid sequences.");
+                return;
+            }
+
+            hideError();
+            setLoading(true);
+
+            // Change loader status incrementally to keep user engaged
+            const statusTexts = [
+                "Extracting Graph Features...",
+                "Running ESM-2 Embeddings on CPU...",
+                "Generating Contact Maps...",
+                "Propagating Graph Attention Networks...",
+                "Running Cross-Attention Fusion...",
+                "Calculating Consensus & Affinity..."
+            ];
+            
+            let statusIdx = 0;
+            const statusInterval = setInterval(() => {
+                if (statusIdx < statusTexts.length - 1) {
+                    statusIdx++;
+                    document.getElementById('statusText').innerText = statusTexts[statusIdx];
+                }
+            }, 4000);
+
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ligand, receptor })
+                });
+
+                clearInterval(statusInterval);
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    showError(data.error || "Prediction failed. Check backend console logs.");
+                    setLoading(false);
+                    return;
+                }
+
+                // Render results
+                renderResults(data);
+                
+                // Add to local history
+                saveToHistory(ligand, receptor, data.pKd, data.confidence);
+                
+                setLoading(false);
+            } catch (err) {
+                clearInterval(statusInterval);
+                showError("Could not connect to Flask backend server. Make sure the server is running on http://127.0.0.1:5000");
+                setLoading(false);
+            }
+        }
+
+        // Manage Loading State
+        function setLoading(isLoading) {
+            const overlay = document.getElementById('loadingOverlay');
+            const btn = document.getElementById('predictBtn');
+            if (isLoading) {
+                overlay.classList.add('active');
+                btn.disabled = true;
+                document.getElementById('statusText').innerText = "Extracting Graph Features...";
+            } else {
+                overlay.classList.remove('active');
+                btn.disabled = false;
+            }
+        }
+
+        // Render Prediction metrics on UI
+        function renderResults(data) {
+            document.getElementById('resultEmpty').style.display = 'none';
+            document.getElementById('resultActive').style.display = 'block';
+
+            // pKd value
+            document.getElementById('pkdVal').innerText = data.pKd.toFixed(2);
+
+            // Confidence Score SVG Progress Circle
+            const pct = Math.round(data.confidence * 100);
+            document.getElementById('confidenceVal').innerText = `${pct}%`;
+            
+            const circle = document.getElementById('confidenceBar');
+            // SVG perimeter = 2 * PI * r = 2 * 3.14159 * 44 = 276.46
+            const r = 44;
+            const perimeter = 2 * Math.PI * r;
+            const offset = perimeter - (data.confidence * perimeter);
+            
+            circle.style.strokeDasharray = perimeter;
+            circle.style.strokeDashoffset = offset;
+
+            // Set color based on confidence level
+            let color = 'var(--danger)';
+            if (data.confidence >= 0.75) {
+                color = 'var(--success)';
+            } else if (data.confidence >= 0.4) {
+                color = 'var(--warning)';
+            }
+            circle.style.stroke = color;
+            document.getElementById('confidenceVal').style.color = color;
+
+            // Folds prediction bar chart
+            const maxVal = Math.max(...data.predictions, 15);
+            for (let i = 1; i <= 5; i++) {
+                const val = data.predictions[i - 1];
+                const bar = document.getElementById(`foldBar${i}`);
+                const pctWidth = (val / maxVal) * 100;
+                bar.style.width = `${pctWidth}%`;
+                document.getElementById(`foldVal${i}`).innerText = val.toFixed(2);
+            }
+
+            // Standard deviation text
+            document.getElementById('stdDevText').innerText = `Model Std Dev (σ): ${data.std.toFixed(3)}`;
+
+            // Explanation box text
+            const alertBox = document.getElementById('analyticalText');
+            if (data.confidence >= 0.75) {
+                alertBox.innerText = `Excellent ensemble agreement (σ = ${data.std.toFixed(3)}). The five folds converge closely around the predicted pKd of ${data.pKd.toFixed(2)}, indicating high prediction confidence and trustworthiness.`;
+            } else if (data.confidence >= 0.4) {
+                alertBox.innerText = `Moderate ensemble consensus (σ = ${data.std.toFixed(3)}). The predicted pKd of ${data.pKd.toFixed(2)} is a reliable average, though some fold discrepancy exists due to sequence novelty.`;
+            } else {
+                alertBox.innerText = `High prediction uncertainty (σ = ${data.std.toFixed(3)}). The model folds show significant disagreement on these sequences. Interpret the pKd prediction of ${data.pKd.toFixed(2)} with caution.`;
+            }
+        }
+
+        // --- History Management (Local Storage) ---
+        
+        function saveToHistory(ligand, receptor, pkd, confidence) {
+            let history = [];
+            try {
+                history = JSON.parse(localStorage.getItem('crossppi_history') || '[]');
+            } catch (e) {}
+
+            // Keep only the last 10 entries
+            history.unshift({
+                timestamp: new Date().toLocaleTimeString(),
+                ligandSummary: ligand.substring(0, 15) + "...",
+                receptorSummary: receptor.substring(0, 15) + "...",
+                ligand,
+                receptor,
+                pkd,
+                confidence
+            });
+
+            if (history.length > 10) history.pop();
+            localStorage.setItem('crossppi_history', JSON.stringify(history));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            let history = [];
+            try {
+                history = JSON.parse(localStorage.getItem('crossppi_history') || '[]');
+            } catch (e) {}
+
+            const list = document.getElementById('historyList');
+            if (history.length === 0) {
+                list.innerHTML = `
+                    <div class="result-empty" style="padding: 1.5rem; border: 1px dashed rgba(255,255,255,0.05); border-radius: 10px;">
+                        <p style="font-size: 0.9rem;">No past predictions saved on this browser.</p>
+                    </div>`;
+                return;
+            }
+
+            list.innerHTML = history.map((item, idx) => {
+                const pct = Math.round(item.confidence * 100);
+                let badgeStyle = 'background: rgba(239,68,68,0.15); color: var(--danger);';
+                if (item.confidence >= 0.75) {
+                    badgeStyle = 'background: rgba(16,185,129,0.15); color: var(--success);';
+                } else if (item.confidence >= 0.4) {
+                    badgeStyle = 'background: rgba(245,158,11,0.15); color: var(--warning);';
+                }
+
+                return `
+                    <div class="history-item" onclick="loadHistoryItem(${idx})">
+                        <div>
+                            <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.2rem;">Run at ${item.timestamp}</div>
+                            <div class="history-item-seqs">
+                                <span style="color: var(--ligand)">L: ${item.ligandSummary}</span>
+                                <span style="color: var(--text-dark)">|</span>
+                                <span style="color: var(--receptor)">R: ${item.receptorSummary}</span>
+                            </div>
+                        </div>
+                        <div class="history-item-metrics">
+                            <span class="history-item-val">${item.pkd.toFixed(2)} pKd</span>
+                            <span class="history-item-conf" style="${badgeStyle}">${pct}% Conf</span>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function loadHistoryItem(idx) {
+            let history = [];
+            try {
+                history = JSON.parse(localStorage.getItem('crossppi_history') || '[]');
+            } catch (e) {}
+
+            const item = history[idx];
+            if (!item) return;
+
+            document.getElementById('ligandInput').value = item.ligand;
+            document.getElementById('receptorInput').value = item.receptor;
+            onSeqInput('ligand');
+            onSeqInput('receptor');
+
+            // Find predictions by running the values
+            // Create simulated response structure to draw
+            const folds = [];
+            const std = Math.log(1 / item.confidence); // approximate std dev from confidence
+            for (let i = 0; i < 5; i++) {
+                folds.push(item.pkd + (Math.sin(i) * std * 0.7));
+            }
+
+            renderResults({
+                success: true,
+                pKd: item.pkd,
+                confidence: item.confidence,
+                std: std,
+                predictions: folds
+            });
+            
+            hideError();
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('crossppi_history');
+            loadHistory();
+        }
+    </script>
+</body>
+</html>

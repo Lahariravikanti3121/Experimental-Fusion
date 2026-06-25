@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: crossppi
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10"
+      - key: FLASK_APP
+        value: app.py
