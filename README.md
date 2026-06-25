@@ -1,3 +1,15 @@
+---
+title: Experimental Fusion - CrossPPI
+emoji: 🧬
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 5000
+pinned: false
+license: mit
+short_description: Protein-protein binding affinity prediction
+---
+
 # CrossPPI
 
 CrossPPI — a cross-attention based deep learning method for protein-protein binding affinity (pKD) prediction.
